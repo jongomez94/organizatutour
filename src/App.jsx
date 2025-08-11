@@ -69,6 +69,35 @@ export default function App() {
   const [showExito, setShowExito] = useState(false);
   const [exitoData, setExitoData] = useState({});
 
+  // Función para detectar si es mobile
+  const isMobile = () => {
+    return window.innerWidth <= 768;
+  };
+
+  // Función para hacer scroll suave a un elemento
+  const scrollToElement = (elementId) => {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    }
+  };
+
+  // Función para cambiar módulo con scroll automático en mobile
+  const handleModuleChange = (moduleName) => {
+    setActiveModule(moduleName);
+    
+    // Si es mobile, hacer scroll al contenido del módulo
+    if (isMobile() && moduleName) {
+      setTimeout(() => {
+        scrollToElement(`module-${moduleName}`);
+      }, 100); // Pequeño delay para asegurar que el DOM se actualice
+    }
+  };
+
   // Colecciones en tiempo real
   const [vehiculos, setVehiculos] = useState([]);
   const [reservas, setReservas] = useState([]);
@@ -486,7 +515,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Módulo 1: Yo tengo un vehículo */}
           <button
-            onClick={() => setActiveModule('ofrecer')}
+            onClick={() => handleModuleChange('ofrecer')}
             className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all text-left"
           >
             <div className="text-4xl mb-4">🚗</div>
@@ -496,7 +525,7 @@ export default function App() {
 
           {/* Módulo 2: Quiero pedir ride */}
           <button
-            onClick={() => setActiveModule('reservar')}
+            onClick={() => handleModuleChange('reservar')}
             className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all text-left"
           >
             <div className="text-4xl mb-4">🎫</div>
@@ -506,7 +535,7 @@ export default function App() {
 
           {/* Módulo 3: Yo quiero ir en el microbus */}
           <button
-            onClick={() => setActiveModule('microbus')}
+            onClick={() => handleModuleChange('microbus')}
             className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all text-left"
           >
             <div className="text-4xl mb-4">🚌</div>
@@ -517,11 +546,11 @@ export default function App() {
 
         {/* Contenido dinámico según módulo activo */}
         {activeModule === 'ofrecer' && (
-          <section className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
+          <section id="module-ofrecer" className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Ofrecer Vehículo</h2>
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => handleModuleChange(null)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 ✕
@@ -574,6 +603,7 @@ export default function App() {
                   <option value="Santa Tecla">Santa Tecla</option>
                   <option value="Metrocentro">Metrocentro</option>
                   <option value="Multiplaza">Multiplaza</option>
+                  <option value="Otro lugar a acordar">Otro lugar a acordar</option>
                 </select>
               </div>
 
@@ -593,11 +623,11 @@ export default function App() {
         )}
 
         {activeModule === 'reservar' && (
-          <section className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
+          <section id="module-reservar" className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Vehículos Disponibles</h2>
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => handleModuleChange(null)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 ✕
@@ -684,11 +714,11 @@ export default function App() {
         )}
 
         {activeModule === 'microbus' && (
-          <section className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
+          <section id="module-microbus" className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Microbus Rentado</h2>
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => handleModuleChange(null)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 ✕
