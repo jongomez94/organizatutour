@@ -56,16 +56,36 @@ export default function App() {
   // Estado para el formulario
   const [nuevoParticipante, setNuevoParticipante] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingList, setIsLoadingList] = useState(true);
 
   // Colección de participantes en tiempo real
   const [participantes, setParticipantes] = useState([]); // [{id, nombre, createdAt}]
 
   // Traer participantes en tiempo real
   useEffect(() => {
+    console.log("🔄 Iniciando listener de participantes...");
+    setIsLoadingList(true);
+    
     const q = query(collection(db, "participantes"), orderBy("createdAt", "asc"));
-    return onSnapshot(q, (snap) => {
-      setParticipantes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        console.log("📊 Datos recibidos de Firestore:", snapshot.docs.length, "documentos");
+        const participantesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log("👥 Participantes procesados:", participantesData);
+        setParticipantes(participantesData);
+        setIsLoadingList(false);
+      },
+      (error) => {
+        console.error("❌ Error en listener de participantes:", error);
+        setIsLoadingList(false);
+      }
+    );
+
+    return unsubscribe;
   }, []);
 
   // Acciones
@@ -116,6 +136,12 @@ export default function App() {
             🍄 FungiTour
           </h1>
           <p className="text-lg text-gray-600">Gestión de Participantes</p>
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isLoadingList ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+            <span className="text-xs text-gray-500">
+              {isLoadingList ? 'Conectando...' : 'Conectado a Firebase'}
+            </span>
+          </div>
         </header>
 
         {/* Formulario para agregar participantes */}
@@ -149,11 +175,17 @@ export default function App() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Lista de Participantes</h2>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {participantes.length} participante{participantes.length !== 1 ? 's' : ''}
+              {isLoadingList ? "Cargando..." : `${participantes.length} participante${participantes.length !== 1 ? 's' : ''}`}
             </span>
           </div>
 
-          {participantes.length === 0 ? (
+          {isLoadingList ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">⏳</div>
+              <p className="text-gray-500 text-lg">Cargando participantes...</p>
+              <p className="text-gray-400 text-sm mt-2">Conectando con Firebase</p>
+            </div>
+          ) : participantes.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">👥</div>
               <p className="text-gray-500 text-lg">Aún no hay participantes registrados</p>
