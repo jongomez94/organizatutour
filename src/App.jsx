@@ -8,6 +8,7 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
@@ -115,9 +116,13 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Traer microbus en tiempo real
+  // Traer microbus en tiempo real (vehículos tipo "renta")
   useEffect(() => {
-    const q = query(collection(db, "microbus"), orderBy("createdAt", "asc"));
+    const q = query(
+      collection(db, "vehiculos"), 
+      where("tipoVehiculo", "==", "renta"),
+      orderBy("createdAt", "asc")
+    );
     
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
@@ -127,10 +132,13 @@ export default function App() {
             ...snapshot.docs[0].data()
           };
           setMicrobus(microbusData);
+        } else {
+          setMicrobus(null);
         }
       },
       (error) => {
         console.error("❌ Error en listener de microbus:", error);
+        setMicrobus(null);
       }
     );
 
@@ -259,7 +267,9 @@ export default function App() {
     setIsLoading(true);
     try {
       await addDoc(collection(db, "reservasMicrobus"), {
+        vehiculoId: microbus.id,
         pasajero: nombreUsuario.trim(),
+        propietario: microbus.propietario,
         createdAt: serverTimestamp(),
       });
       
@@ -332,6 +342,22 @@ export default function App() {
         {/* Campo de nombre */}
         <section className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-800">Tu Información</h2>
+          
+          {/* Instrucciones importantes */}
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl text-red-500">⚠️</div>
+              <div>
+                <h4 className="font-semibold text-red-800 mb-1">Importante</h4>
+                <p className="text-sm text-red-700 leading-relaxed">
+                  <strong>Usa siempre el mismo nombre y apellido de ahora en adelante.</strong> 
+                  Esto es necesario para que puedas cancelar tus reservas y para que el sistema 
+                  te reconozca correctamente.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="flex flex-col sm:flex-row gap-4">
             <input
               type="text"
@@ -466,15 +492,17 @@ export default function App() {
               </button>
             </div>
 
-            {vehiculos.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">🚗</div>
-                <p className="text-gray-500 text-lg">No hay vehículos disponibles</p>
-                <p className="text-gray-400 text-sm mt-2">Sé el primero en ofrecer un vehículo</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {vehiculos.map((vehiculo) => {
+            {(() => {
+              const vehiculosPropios = vehiculos.filter(v => v.tipoVehiculo === 'propio');
+              return vehiculosPropios.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🚗</div>
+                  <p className="text-gray-500 text-lg">No hay vehículos propios disponibles</p>
+                  <p className="text-gray-400 text-sm mt-2">Sé el primero en ofrecer tu vehículo</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {vehiculosPropios.map((vehiculo) => {
                   const asientosOcupados = getAsientosOcupados(vehiculo.id);
                   const asientosLibres = vehiculo.asientosDisponibles - asientosOcupados;
                   const reservasVehiculo = reservas.filter(r => r.vehiculoId === vehiculo.id);
@@ -539,7 +567,7 @@ export default function App() {
                   );
                 })}
               </div>
-            )}
+            )})()}
           </section>
         )}
 
@@ -575,19 +603,20 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-2xl p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="font-semibold text-gray-800">Microbus Rentado</h3>
-                      <p className="text-sm text-gray-600">Organizado por: {microbus.propietario}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-emerald-600">
-                        {microbus.asientosDisponibles - reservasMicrobus.length}/{microbus.asientosDisponibles}
-                      </div>
-                      <div className="text-xs text-gray-500">asientos libres</div>
-                    </div>
-                  </div>
+                 <div className="border border-gray-200 rounded-2xl p-6">
+                   <div className="flex items-start justify-between mb-4">
+                     <div>
+                       <h3 className="font-semibold text-gray-800">Microbus Rentado</h3>
+                       <p className="text-sm text-gray-600">Organizado por: {microbus.propietario}</p>
+                       <p className="text-sm text-gray-600">Punto de encuentro: {microbus.puntoEncuentro}</p>
+                     </div>
+                     <div className="text-right">
+                       <div className="text-lg font-semibold text-emerald-600">
+                         {microbus.asientosDisponibles - reservasMicrobus.length}/{microbus.asientosDisponibles}
+                       </div>
+                       <div className="text-xs text-gray-500">asientos libres</div>
+                     </div>
+                   </div>
 
                   {reservasMicrobus.length < microbus.asientosDisponibles ? (
                     <button
