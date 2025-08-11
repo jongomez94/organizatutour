@@ -40,6 +40,13 @@ const FIREBASE_CONFIG = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Debug: Verificar que las variables de entorno se cargan correctamente
+console.log("Firebase Config:", {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? "✅ Cargada" : "❌ No encontrada",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? "✅ Cargada" : "❌ No encontrada",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ? "✅ Cargada" : "❌ No encontrada",
+});
+
 // 2) Inicializa Firebase (evita doble init en hot reload)
 const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 const db = getFirestore(app);
@@ -71,13 +78,18 @@ export default function App() {
 
     setIsLoading(true);
     try {
-      await addDoc(collection(db, "participantes"), {
+      console.log("🔄 Intentando agregar participante:", nuevoParticipante.trim());
+      console.log("📁 Colección destino:", "participantes");
+      
+      const docRef = await addDoc(collection(db, "participantes"), {
         nombre: nuevoParticipante.trim(),
         createdAt: serverTimestamp(),
       });
+      
+      console.log("✅ Participante agregado exitosamente con ID:", docRef.id);
       setNuevoParticipante(""); // Limpiar el formulario
     } catch (error) {
-      console.error("Error al agregar participante:", error);
+      console.error("❌ Error al agregar participante:", error);
       alert("Error al agregar participante. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
