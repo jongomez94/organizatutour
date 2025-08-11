@@ -63,10 +63,16 @@ export default function App() {
   const [puntoEncuentro, setPuntoEncuentro] = useState("");
   const [tipoVehiculo, setTipoVehiculo] = useState("propio");
 
+  // Estados para confirmaciones
+  const [showConfirmacion, setShowConfirmacion] = useState(false);
+  const [confirmacionData, setConfirmacionData] = useState({});
+  const [showExito, setShowExito] = useState(false);
+  const [exitoData, setExitoData] = useState({});
+
   // Colecciones en tiempo real
   const [vehiculos, setVehiculos] = useState([]);
   const [reservas, setReservas] = useState([]);
-  const [microbus, setMicrobus] = useState(null);
+  const [microbuses, setMicrobus] = useState([]);
   const [reservasMicrobus, setReservasMicrobus] = useState([]);
 
   // Traer vehículos en tiempo real
@@ -116,7 +122,7 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Traer microbus en tiempo real (vehículos tipo "renta")
+  // Traer microbuses en tiempo real (vehículos tipo "renta")
   useEffect(() => {
     const q = query(
       collection(db, "vehiculos"), 
@@ -127,18 +133,18 @@ export default function App() {
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
         if (snapshot.docs.length > 0) {
-          const microbusData = {
-            id: snapshot.docs[0].id,
-            ...snapshot.docs[0].data()
-          };
-          setMicrobus(microbusData);
+          const microbusesData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setMicrobus(microbusesData);
         } else {
-          setMicrobus(null);
+          setMicrobus([]);
         }
       },
       (error) => {
         console.error("❌ Error en listener de microbus:", error);
-        setMicrobus(null);
+        setMicrobus([]);
       }
     );
 
@@ -175,7 +181,7 @@ export default function App() {
   };
 
   // Acciones para Módulo 1: Ofrecer vehículo
-  const handleOfrecerVehiculo = async (e) => {
+  const handleOfrecerVehiculo = (e) => {
     e.preventDefault();
     if (!requireName()) return;
     if (!puntoEncuentro) {
@@ -183,17 +189,47 @@ export default function App() {
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const docRef = await addDoc(collection(db, "vehiculos"), {
+    // Mostrar resumen antes de confirmar
+    const accion = tipoVehiculo === 'propio' ? 'ofrecer tu vehículo' : 'ofrecer tu microbus para renta';
+    const resumen = tipoVehiculo === 'propio' 
+      ? `ofrecer tu vehículo con ${asientosDisponibles} asientos disponibles desde ${puntoEncuentro}`
+      : `ofrecer tu microbus para renta con ${asientosDisponibles} asientos disponibles desde ${puntoEncuentro}`;
+
+    setConfirmacionData({
+      titulo: `Confirmar ${tipoVehiculo === 'propio' ? 'Vehículo' : 'Microbus'}`,
+      mensaje: `¿Estás seguro de que quieres ${resumen}?`,
+      accion: 'ofrecerVehiculo',
+      datos: {
         propietario: nombreUsuario.trim(),
         asientosDisponibles: Number(asientosDisponibles),
         puntoEncuentro: puntoEncuentro,
-        tipoVehiculo: tipoVehiculo,
+        tipoVehiculo: tipoVehiculo
+      }
+    });
+    setShowConfirmacion(true);
+  };
+
+  const confirmarOfrecerVehiculo = async () => {
+    setIsLoading(true);
+    try {
+      const docRef = await addDoc(collection(db, "vehiculos"), {
+        ...confirmacionData.datos,
         createdAt: serverTimestamp(),
       });
       
       console.log("✅ Vehículo agregado exitosamente:", docRef.id);
+      
+      // Mostrar mensaje de éxito
+      const mensajeExito = confirmacionData.datos.tipoVehiculo === 'propio'
+        ? "Muchas gracias por poner tu vehículo a disposición. Ahora aparecerá en la sección de \"Quiero Pedir Ride\". Si deseas eliminarlo o editar el número de asientos habla con Jonathan, por favor."
+        : "Muchas gracias por ofrecer tu microbus para la renta. Una vez que tengamos llenos los asientos te avisaremos para organizar los pagos.";
+
+      setExitoData({
+        titulo: "¡Vehículo registrado exitosamente!",
+        mensaje: mensajeExito
+      });
+      setShowExito(true);
+      
       setActiveModule(null);
       setAsientosDisponibles(4);
       setPuntoEncuentro("");
@@ -203,11 +239,12 @@ export default function App() {
       alert("Error al agregar vehículo. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
+      setShowConfirmacion(false);
     }
   };
 
   // Acciones para Módulo 2: Reservar asiento
-  const handleReservarAsiento = async (vehiculoId, propietario) => {
+  const handleReservarAsiento = (vehiculoId, propietario, puntoEncuentro) => {
     if (!requireName()) return;
     
     // Verificar si ya tiene una reserva en este vehículo
@@ -220,66 +257,114 @@ export default function App() {
       return;
     }
 
-    setIsLoading(true);
-    try {
-      await addDoc(collection(db, "reservas"), {
+    // Mostrar resumen antes de confirmar
+    setConfirmacionData({
+      titulo: "Confirmar Reserva",
+      mensaje: `Vas a reservar un espacio en el vehículo de "${propietario}", bajo el nombre de "${nombreUsuario.trim()}". Si necesitas cancelarlo o cambias de opinión, déjale saber a Jonathan.`,
+      accion: 'reservarAsiento',
+      datos: {
         vehiculoId: vehiculoId,
         pasajero: nombreUsuario.trim(),
         propietario: propietario,
+        puntoEncuentro: puntoEncuentro
+      }
+    });
+    setShowConfirmacion(true);
+  };
+
+  const confirmarReservarAsiento = async () => {
+    setIsLoading(true);
+    try {
+      await addDoc(collection(db, "reservas"), {
+        ...confirmacionData.datos,
         createdAt: serverTimestamp(),
       });
       
       console.log("✅ Asiento reservado exitosamente");
+      
+      setExitoData({
+        titulo: "¡Reserva confirmada!",
+        mensaje: `Has reservado exitosamente un asiento en el vehículo de ${confirmacionData.datos.propietario}. Te esperamos en ${confirmacionData.datos.puntoEncuentro}.`
+      });
+      setShowExito(true);
+      
       setActiveModule(null);
     } catch (error) {
       console.error("❌ Error al reservar asiento:", error);
       alert("Error al reservar asiento. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
+      setShowConfirmacion(false);
     }
   };
 
   // Acciones para Módulo 3: Reservar microbus
-  const handleReservarMicrobus = async () => {
+  const handleReservarMicrobus = (microbusId, propietario, asientosDisponibles, puntoEncuentro) => {
     if (!requireName()) return;
     
-    if (!microbus) {
+    if (!microbuses || microbuses.length === 0) {
       alert("No hay microbus disponible en este momento.");
       return;
     }
 
-    // Verificar si ya tiene una reserva en el microbus
+    // Verificar si ya tiene una reserva en este microbus específico
     const reservaExistente = reservasMicrobus.find(r => 
-      r.pasajero.toLowerCase() === nombreUsuario.trim().toLowerCase()
+      r.vehiculoId === microbusId && r.pasajero.toLowerCase() === nombreUsuario.trim().toLowerCase()
     );
     
     if (reservaExistente) {
-      alert("Ya tienes una reserva en el microbus.");
+      alert("Ya tienes una reserva en este microbus.");
       return;
     }
 
-    const asientosOcupados = reservasMicrobus.length;
-    if (asientosOcupados >= microbus.asientosDisponibles) {
-      alert("El microbus está lleno.");
+    // Contar asientos ocupados en este microbus específico
+    const asientosOcupados = reservasMicrobus.filter(r => r.vehiculoId === microbusId).length;
+    if (asientosOcupados >= asientosDisponibles) {
+      alert("Este microbus está lleno.");
       return;
     }
 
+    // Mostrar resumen antes de confirmar
+    setConfirmacionData({
+      titulo: "Confirmar Reserva en Microbus",
+      mensaje: `Vas a reservar un asiento en el microbus de "${propietario}" bajo el nombre de "${nombreUsuario.trim()}". Recuerda que el costo es de $15-$20 y solamente se confirmará si se llenan todos los asientos. Si necesitas cancelarlo o cambias de opinión, déjale saber a Jonathan.`,
+      accion: 'reservarMicrobus',
+      datos: {
+        vehiculoId: microbusId,
+        pasajero: nombreUsuario.trim(),
+        propietario: propietario,
+        asientosDisponibles: asientosDisponibles,
+        puntoEncuentro: puntoEncuentro
+      }
+    });
+    setShowConfirmacion(true);
+  };
+
+  const confirmarReservarMicrobus = async () => {
     setIsLoading(true);
     try {
       await addDoc(collection(db, "reservasMicrobus"), {
-        vehiculoId: microbus.id,
-        pasajero: nombreUsuario.trim(),
-        propietario: microbus.propietario,
+        vehiculoId: confirmacionData.datos.vehiculoId,
+        pasajero: confirmacionData.datos.pasajero,
+        propietario: confirmacionData.datos.propietario,
         createdAt: serverTimestamp(),
       });
       
       console.log("✅ Asiento en microbus reservado exitosamente");
+      
+      setExitoData({
+        titulo: "¡Reserva en Microbus confirmada!",
+        mensaje: `Has reservado exitosamente un asiento en el microbus de ${confirmacionData.datos.propietario}. Te esperamos en ${confirmacionData.datos.puntoEncuentro}. Recuerda que el costo es de $15-$20.`
+      });
+      setShowExito(true);
+      
       setActiveModule(null);
     } catch (error) {
       console.error("❌ Error al reservar asiento en microbus:", error);
       alert("Error al reservar asiento. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
+      setShowConfirmacion(false);
     }
   };
 
@@ -320,6 +405,33 @@ export default function App() {
         alert("Error al cancelar reserva. Intenta de nuevo.");
       }
     }
+  };
+
+  // Funciones para manejar confirmaciones
+  const handleConfirmar = () => {
+    switch (confirmacionData.accion) {
+      case 'ofrecerVehiculo':
+        confirmarOfrecerVehiculo();
+        break;
+      case 'reservarAsiento':
+        confirmarReservarAsiento();
+        break;
+      case 'reservarMicrobus':
+        confirmarReservarMicrobus();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleCancelar = () => {
+    setShowConfirmacion(false);
+    setConfirmacionData({});
+  };
+
+  const handleCerrarExito = () => {
+    setShowExito(false);
+    setExitoData({});
   };
 
   return (
@@ -527,7 +639,7 @@ export default function App() {
 
                       {asientosLibres > 0 ? (
                         <button
-                          onClick={() => handleReservarAsiento(vehiculo.id, vehiculo.propietario)}
+                          onClick={() => handleReservarAsiento(vehiculo.id, vehiculo.propietario, vehiculo.puntoEncuentro)}
                           disabled={isLoading || !nombreUsuario.trim()}
                           className={`w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow transition-colors ${
                             isLoading || !nombreUsuario.trim()
@@ -583,11 +695,11 @@ export default function App() {
               </button>
             </div>
 
-            {!microbus ? (
+            {microbuses.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">🚌</div>
-                <p className="text-gray-500 text-lg">No hay microbus disponible</p>
-                <p className="text-gray-400 text-sm mt-2">El microbus aún no ha sido configurado</p>
+                <p className="text-gray-500 text-lg">No hay microbuses disponibles</p>
+                <p className="text-gray-400 text-sm mt-2">Los microbuses aún no han sido configurados</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -603,60 +715,68 @@ export default function App() {
                   </div>
                 </div>
 
-                 <div className="border border-gray-200 rounded-2xl p-6">
-                   <div className="flex items-start justify-between mb-4">
-                     <div>
-                       <h3 className="font-semibold text-gray-800">Microbus Rentado</h3>
-                       <p className="text-sm text-gray-600">Organizado por: {microbus.propietario}</p>
-                       <p className="text-sm text-gray-600">Punto de encuentro: {microbus.puntoEncuentro}</p>
-                     </div>
-                     <div className="text-right">
-                       <div className="text-lg font-semibold text-emerald-600">
-                         {microbus.asientosDisponibles - reservasMicrobus.length}/{microbus.asientosDisponibles}
-                       </div>
-                       <div className="text-xs text-gray-500">asientos libres</div>
-                     </div>
-                   </div>
-
-                  {reservasMicrobus.length < microbus.asientosDisponibles ? (
-                    <button
-                      onClick={handleReservarMicrobus}
-                      disabled={isLoading || !nombreUsuario.trim()}
-                      className={`w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow transition-colors ${
-                        isLoading || !nombreUsuario.trim()
-                          ? "bg-gray-300 cursor-not-allowed"
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                      }`}
-                    >
-                      {isLoading ? "Reservando..." : "Reservar Asiento en Microbus"}
-                    </button>
-                  ) : (
-                    <div className="text-center text-sm text-gray-500 bg-gray-100 rounded-2xl px-4 py-2">
-                      Microbus lleno
-                    </div>
-                  )}
-
-                  {reservasMicrobus.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-600 mb-2">Pasajeros confirmados:</p>
-                      <div className="space-y-1">
-                        {reservasMicrobus.map((reserva) => (
-                          <div key={reserva.id} className="flex items-center justify-between text-sm">
-                            <span>{reserva.pasajero}</span>
-                            {reserva.pasajero.toLowerCase() === nombreUsuario.trim().toLowerCase() && (
-                              <button
-                                onClick={() => handleCancelarReservaMicrobus(reserva.id, reserva.pasajero)}
-                                className="text-red-500 hover:text-red-700 text-xs"
-                              >
-                                Cancelar
-                              </button>
-                            )}
+                {microbuses.map((microbus) => {
+                  const reservasMicrobusEspecifico = reservasMicrobus.filter(r => r.vehiculoId === microbus.id);
+                  const asientosOcupados = reservasMicrobusEspecifico.length;
+                  const asientosLibres = microbus.asientosDisponibles - asientosOcupados;
+                  
+                  return (
+                    <div key={microbus.id} className="border border-gray-200 rounded-2xl p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">Microbus Rentado</h3>
+                          <p className="text-sm text-gray-600">Organizado por: {microbus.propietario}</p>
+                          <p className="text-sm text-gray-600">Punto de encuentro: {microbus.puntoEncuentro}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-emerald-600">
+                            {asientosLibres}/{microbus.asientosDisponibles}
                           </div>
-                        ))}
+                          <div className="text-xs text-gray-500">asientos libres</div>
+                        </div>
                       </div>
+
+                      {asientosLibres > 0 ? (
+                        <button
+                          onClick={() => handleReservarMicrobus(microbus.id, microbus.propietario, microbus.asientosDisponibles, microbus.puntoEncuentro)}
+                          disabled={isLoading || !nombreUsuario.trim()}
+                          className={`w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow transition-colors ${
+                            isLoading || !nombreUsuario.trim()
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : "bg-emerald-600 hover:bg-emerald-700"
+                          }`}
+                        >
+                          {isLoading ? "Reservando..." : "Reservar Asiento en Microbus"}
+                        </button>
+                      ) : (
+                        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded-2xl px-4 py-2">
+                          Microbus lleno
+                        </div>
+                      )}
+
+                      {reservasMicrobusEspecifico.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-600 mb-2">Pasajeros confirmados:</p>
+                          <div className="space-y-1">
+                            {reservasMicrobusEspecifico.map((reserva) => (
+                              <div key={reserva.id} className="flex items-center justify-between text-sm">
+                                <span>{reserva.pasajero}</span>
+                                {reserva.pasajero.toLowerCase() === nombreUsuario.trim().toLowerCase() && (
+                                  <button
+                                    onClick={() => handleCancelarReservaMicrobus(reserva.id, reserva.pasajero)}
+                                    className="text-red-500 hover:text-red-700 text-xs"
+                                  >
+                                    Cancelar
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -666,6 +786,57 @@ export default function App() {
         <footer className="mt-8 text-center text-sm text-gray-500">
           <p>✨ Actualizaciones en tiempo real con Firebase</p>
         </footer>
+
+        {/* Modal de Confirmación */}
+        {showConfirmacion && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-xl">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🤔</div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">{confirmacionData.titulo}</h3>
+                <p className="text-gray-600 mb-6 leading-relaxed">{confirmacionData.mensaje}</p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelar}
+                    className="flex-1 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmar}
+                    disabled={isLoading}
+                    className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow transition-colors ${
+                      isLoading ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                    }`}
+                  >
+                    {isLoading ? "Procesando..." : "Confirmar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Éxito */}
+        {showExito && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-xl">
+              <div className="text-center">
+                <div className="text-4xl mb-4">✅</div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">{exitoData.titulo}</h3>
+                <p className="text-gray-600 mb-6 leading-relaxed">{exitoData.mensaje}</p>
+                
+                <button
+                  onClick={handleCerrarExito}
+                  className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow transition-colors"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
