@@ -62,6 +62,7 @@ export default function App() {
   const [asientosDisponibles, setAsientosDisponibles] = useState(4);
   const [puntoEncuentro, setPuntoEncuentro] = useState("");
   const [tipoVehiculo, setTipoVehiculo] = useState("propio");
+  const [notas, setNotas] = useState("");
 
   // Estados para confirmaciones
   const [showConfirmacion, setShowConfirmacion] = useState(false);
@@ -232,7 +233,8 @@ export default function App() {
         propietario: nombreUsuario.trim(),
         asientosDisponibles: Number(asientosDisponibles),
         puntoEncuentro: puntoEncuentro,
-        tipoVehiculo: tipoVehiculo
+        tipoVehiculo: tipoVehiculo,
+        notas: notas.trim()
       }
     });
     setShowConfirmacion(true);
@@ -263,6 +265,7 @@ export default function App() {
       setAsientosDisponibles(4);
       setPuntoEncuentro("");
       setTipoVehiculo("propio");
+      setNotas("");
     } catch (error) {
       console.error("❌ Error al agregar vehículo:", error);
       alert("Error al agregar vehículo. Intenta de nuevo.");
@@ -607,6 +610,19 @@ export default function App() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notas adicionales (opcional)
+                </label>
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  placeholder="Ej: Pasaré por las personas en X lugar, No fumar, traer almuerzo, salida a las 8am, etc."
+                  rows={3}
+                  className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading || !nombreUsuario.trim() || !puntoEncuentro}
@@ -666,6 +682,19 @@ export default function App() {
                           <div className="text-xs text-gray-500">asientos libres</div>
                         </div>
                       </div>
+
+                      {/* Mostrar notas si existen */}
+                      {vehiculo.notas && vehiculo.notas.trim() && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
+                          <div className="flex items-start gap-2">
+                            <div className="text-blue-500 text-sm">📝</div>
+                            <div>
+                              <p className="text-xs text-blue-600 font-medium mb-1">Notas del conductor:</p>
+                              <p className="text-sm text-blue-700 leading-relaxed">{vehiculo.notas}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {asientosLibres > 0 ? (
                         <button
@@ -765,6 +794,19 @@ export default function App() {
                           <div className="text-xs text-gray-500">asientos libres</div>
                         </div>
                       </div>
+
+                      {/* Mostrar notas si existen */}
+                      {microbus.notas && microbus.notas.trim() && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
+                          <div className="flex items-start gap-2">
+                            <div className="text-blue-500 text-sm">📝</div>
+                            <div>
+                              <p className="text-xs text-blue-600 font-medium mb-1">Notas del organizador:</p>
+                              <p className="text-sm text-blue-700 leading-relaxed">{microbus.notas}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {asientosLibres > 0 ? (
                         <button
